@@ -19,6 +19,29 @@ import {
   FiDownload
 } from 'react-icons/fi';
 
+// Safe date formatting utility
+const formatOrderDate = (date: any): string => {
+  try {
+    if (!date) return 'Date not available';
+    
+    // Handle Firestore Timestamp
+    if (date && typeof date === 'object' && date.toDate) {
+      return format(date.toDate(), 'PPP');
+    }
+    
+    // Handle Date object or string
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Date not available';
+    }
+    
+    return format(dateObj, 'PPP');
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Date not available';
+  }
+};
+
 const OrdersPage = () => {
   const { user, isLoading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -283,7 +306,7 @@ const OrdersPage = () => {
                         Order #{order.orderNumber}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Placed on {format(new Date(order.createdAt as any || Date.now()), 'PPP')}
+                        Placed on {formatOrderDate(order.createdAt)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 mt-3 md:mt-0">
