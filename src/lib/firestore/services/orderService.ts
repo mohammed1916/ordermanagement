@@ -247,11 +247,13 @@ export class CartService extends BaseFirestoreService<Cart> {
 
   // Get or create user cart
   async getUserCart(userId: string): Promise<Cart> {
+    console.log('Getting cart for user:', userId);
     let cart = await this.getById(userId);
     
     if (!cart) {
-      // Create new cart
-      await this.create({
+      console.log('Cart not found, creating new cart for user:', userId);
+      // Create new cart with userId as document ID
+      await this.createWithId(userId, {
         userId,
         items: [],
         pricing: {
@@ -266,6 +268,7 @@ export class CartService extends BaseFirestoreService<Cart> {
       });
       
       cart = await this.getById(userId);
+      console.log('New cart created:', cart);
     }
     
     return cart!;

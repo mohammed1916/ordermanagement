@@ -31,7 +31,7 @@ export default function Home() {
       y: 0,
       transition: {
         duration: 0.6,
-        ease: "easeOut"
+        ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number]
       }
     }
   };
@@ -43,7 +43,7 @@ export default function Home() {
       scale: 1,
       transition: {
         duration: 0.8,
-        ease: "easeOut"
+        ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number]
       }
     }
   };
@@ -120,8 +120,7 @@ export default function Home() {
                     src={category.image}
                     alt={category.name}
                     fill
-                    objectFit="cover"
-                    className="rounded-2xl transform group-hover:scale-110 transition-transform duration-500"
+                    className="rounded-2xl object-cover transform group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent group-hover:from-black/40 transition-all duration-300" />
                   <div className="absolute inset-0 flex items-center justify-center">

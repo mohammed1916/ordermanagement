@@ -40,6 +40,7 @@ src/lib/firestore/
 **Schema**: `UserProfile`
 
 **Key Features**:
+
 - User preferences and settings
 - Multiple saved addresses
 - Admin role management
@@ -48,8 +49,9 @@ src/lib/firestore/
 **Service**: `UserService`
 
 **Common Operations**:
+
 ```typescript
-import { userService } from '@/lib/firestore/services';
+import { userService } from "@/lib/firestore/services";
 
 // Create user
 const userId = await userService.createUser(userData);
@@ -69,6 +71,7 @@ await userService.updatePreferences(userId, preferences);
 **Schema**: `Product`
 
 **Key Features**:
+
 - Multiple images with color variants
 - Size and color availability tracking
 - Stock management at variant level
@@ -78,21 +81,22 @@ await userService.updatePreferences(userId, preferences);
 **Service**: `ProductService`
 
 **Common Operations**:
+
 ```typescript
-import { productService } from '@/lib/firestore/services';
+import { productService } from "@/lib/firestore/services";
 
 // Get active products
 const products = await productService.getActiveProducts();
 
 // Search products
-const searchResults = await productService.searchProducts('t-shirt');
+const searchResults = await productService.searchProducts("t-shirt");
 
 // Get filtered products
 const filtered = await productService.getFilteredProducts({
-  categories: ['men'],
+  categories: ["men"],
   priceMin: 100,
   priceMax: 500,
-  sortBy: 'price_asc'
+  sortBy: "price_asc",
 });
 
 // Update stock
@@ -104,6 +108,7 @@ await productService.updateStock(productId, newQuantity);
 **Schema**: `Order`
 
 **Key Features**:
+
 - Comprehensive order lifecycle tracking
 - Payment integration support
 - Shipping and delivery management
@@ -113,8 +118,9 @@ await productService.updateStock(productId, newQuantity);
 **Service**: `OrderService`
 
 **Common Operations**:
+
 ```typescript
-import { orderService } from '@/lib/firestore/services';
+import { orderService } from "@/lib/firestore/services";
 
 // Create order
 const orderId = await orderService.createOrder(orderData);
@@ -123,10 +129,10 @@ const orderId = await orderService.createOrder(orderData);
 const userOrders = await orderService.getOrdersByUser(userId);
 
 // Update order status
-await orderService.updateOrderStatus(orderId, 'shipped', 'Order dispatched');
+await orderService.updateOrderStatus(orderId, "shipped", "Order dispatched");
 
 // Cancel order
-await orderService.cancelOrder(orderId, 'Customer requested cancellation');
+await orderService.cancelOrder(orderId, "Customer requested cancellation");
 ```
 
 ### 4. Carts Collection (`carts`)
@@ -134,6 +140,7 @@ await orderService.cancelOrder(orderId, 'Customer requested cancellation');
 **Schema**: `Cart`
 
 **Key Features**:
+
 - User-specific cart storage
 - Automatic pricing calculations
 - Coupon application support
@@ -142,8 +149,9 @@ await orderService.cancelOrder(orderId, 'Customer requested cancellation');
 **Service**: `CartService`
 
 **Common Operations**:
+
 ```typescript
-import { cartService } from '@/lib/firestore/services';
+import { cartService } from "@/lib/firestore/services";
 
 // Get user cart
 const cart = await cartService.getUserCart(userId);
@@ -161,30 +169,36 @@ await cartService.clearCart(userId);
 ## Additional Collections
 
 ### Product Categories (`productCategories`)
+
 - Hierarchical category structure
 - SEO-friendly slugs
 - Category-specific metadata
 
 ### Product Reviews (`productReviews`)
+
 - User reviews and ratings
 - Admin approval system
 - Review helpfulness tracking
 
 ### Coupons (`coupons`)
+
 - Discount code management
 - Usage tracking and limits
 - Product/category-specific coupons
 
 ### Wishlists (`wishlists`)
+
 - User wishlist management
 - Shareable wishlist support
 
 ### Notifications (`notifications`)
+
 - User notification system
 - Multiple notification types
 - Read/unread status tracking
 
 ### Analytics Collections
+
 - Product view tracking (`productViews`)
 - Search query analysis (`searchQueries`)
 - Inventory transaction logs (`inventoryTransactions`)
@@ -209,9 +223,9 @@ interface Product extends BaseDocument {
 Built-in validation functions ensure data integrity:
 
 ```typescript
-export const validateProductData = (data: Omit<Product, 'id'>): void => {
+export const validateProductData = (data: Omit<Product, "id">): void => {
   if (!data.name || !data.price || data.price <= 0) {
-    throw new Error('Invalid product data');
+    throw new Error("Invalid product data");
   }
 };
 ```
@@ -267,10 +281,10 @@ Legacy wrapper functions are provided for backward compatibility:
 
 ```typescript
 // Old way (still works)
-import { saveCartToFirestore } from '@/lib/firestore/cart';
+import { saveCartToFirestore } from "@/lib/firestore/cart";
 
 // New way (recommended)
-import { cartService } from '@/lib/firestore/services';
+import { cartService } from "@/lib/firestore/services";
 await cartService.addToCart(userId, itemData);
 ```
 
@@ -295,18 +309,22 @@ await cartService.addToCart(userId, itemData);
 ### Complete Product Flow
 
 ```typescript
-import { productService, cartService, orderService } from '@/lib/firestore/services';
+import {
+  productService,
+  cartService,
+  orderService,
+} from "@/lib/firestore/services";
 
 // 1. Search for products
-const products = await productService.searchProducts('t-shirt');
+const products = await productService.searchProducts("t-shirt");
 
 // 2. Add to cart
 await cartService.addToCart(userId, {
   productId: products[0].id!,
   productName: products[0].name,
   quantity: 2,
-  size: 'L',
-  color: 'blue',
+  size: "L",
+  color: "blue",
   unitPrice: products[0].price,
   // ... other required fields
 });
@@ -315,7 +333,7 @@ await cartService.addToCart(userId, {
 const cart = await cartService.getUserCart(userId);
 const orderData = {
   userId,
-  items: cart.items.map(item => ({
+  items: cart.items.map((item) => ({
     // Convert cart item to order item
   })),
   // ... other order data

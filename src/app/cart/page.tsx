@@ -7,9 +7,20 @@ import { useCart } from '@/context/CartContext';
 import withAuth from '@/components/hoc/withAuth';
 
 function Cart() {
-    const { cart, updateQuantity, removeFromCart } = useCart();
+    const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
 
-    if (cart.items.length === 0) {
+    // Early return for loading state
+    if (isLoading) {
+        return (
+            <div className="max-w-4xl mx-auto text-center py-16">
+                <h1 className="text-3xl font-bold mb-4">Your Cart</h1>
+                <p className="text-gray-600 mb-8">Loading cart...</p>
+            </div>
+        );
+    }
+
+    // Early return for empty cart or no cart data
+    if (!cart || !cart.items || cart.items.length === 0) {
         return (
             <div className="max-w-4xl mx-auto text-center py-16">
                 <h1 className="text-3xl font-bold mb-4">Your Cart</h1>
@@ -21,6 +32,13 @@ function Cart() {
         );
     }
 
+    // Validate cart pricing data
+    const hasValidPricing = cart && cart.pricing && 
+                           typeof cart.pricing.subtotal === 'number' && 
+                           typeof cart.pricing.shipping === 'number' && 
+                           typeof cart.pricing.tax === 'number' && 
+                           typeof cart.pricing.total === 'number';
+
     return (
         <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
@@ -31,13 +49,13 @@ function Cart() {
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <ul role="list" className="divide-y divide-gray-200">
                             {cart.items.map((item) => (
-                                <li key={`${item.product.id}-${item.size}-${item.color}`} className="p-6">
+                                <li key={`${item.productId}-${item.size}-${item.color}`} className="p-6">
                                     <div className="flex items-center">
                                         {/* Product Image */}
                                         <div className="w-24 h-24  rounded-md flex-shrink-0" >
                                             <img
-                                                src={item.product.images[0]}
-                                                alt={item.product.name}
+                                                src={item.productImage}
+                                                alt={item.productName}
                                                 className="w-full h-full object-cover rounded-md"
                                             />
                                         </div>
@@ -46,12 +64,12 @@ function Cart() {
                                         <div className="ml-6 flex-1">
                                             <div className="flex justify-between">
                                                 <h3 className="text-lg font-medium text-gray-900">
-                                                    <Link href={`/product/${item.product.id}`} className="hover:text-blue-500">
-                                                        {item.product.name}
+                                                    <Link href={`/product/${item.productId}`} className="hover:text-blue-500">
+                                                        {item.productName}
                                                     </Link>
                                                 </h3>
                                                 <p className="text-lg font-medium text-gray-900">
-                                                    ₹{(item.product.price * item.quantity).toFixed(2)}
+                                                    ₹{item.totalPrice.toFixed(2)}
                                                 </p>
                                             </div>
 
@@ -63,14 +81,14 @@ function Cart() {
                                                 {/* Quantity Selector */}
                                                 <div className="flex items-center border border-gray-300 rounded-md">
                                                     <button
-                                                        onClick={() => updateQuantity(item.product.id, Math.max(1, item.quantity - 1))}
+                                                        onClick={() => updateQuantity(item.productId, Math.max(1, item.quantity - 1))}
                                                         className="px-3 py-1 text-gray-600 hover:bg-gray-100"
                                                     >
                                                         -
                                                     </button>
                                                     <span className="px-3 py-1">{item.quantity}</span>
                                                     <button
-                                                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                                                         className="px-3 py-1 text-gray-600 hover:bg-gray-100"
                                                     >
                                                         +
@@ -79,7 +97,7 @@ function Cart() {
 
                                                 {/* Remove Button */}
                                                 <button
-                                                    onClick={() => removeFromCart(item.product.id)}
+                                                    onClick={() => removeFromCart(item.productId)}
                                                     className="text-sm font-medium text-red-600 hover:text-red-500"
                                                 >
                                                     Remove
@@ -110,20 +128,28 @@ function Cart() {
                         <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <p className="text-gray-600">Subtotal</p>
-                                <p className="text-gray-900 font-medium">₹{cart.total.toFixed(2)}</p>
+                                <p className="text-gray-900 font-medium">
+                                    {hasValidPricing ? 
+                                        `₹${cart.pricing.subtotal.toFixed(2)}` : 
+                                        'No info available'}
+                                </p>
                             </div>
 
                             <div className="flex justify-between">
                                 <p className="text-gray-600">Shipping</p>
                                 <p className="text-gray-900 font-medium">
-                                    {cart.total >= 1000 ? 'Free' : '₹79.00'}
+                                    {hasValidPricing ? 
+                                        (cart.pricing.shipping === 0 ? 'Free' : `₹${cart.pricing.shipping.toFixed(2)}`) : 
+                                        'No info available'}
                                 </p>
                             </div>
 
                             <div className="flex justify-between">
                                 <p className="text-gray-600">Tax</p>
                                 <p className="text-gray-900 font-medium">
-                                    ₹{(cart.total * 0.05).toFixed(2)}
+                                    {hasValidPricing ? 
+                                        `₹${cart.pricing.tax.toFixed(2)}` : 
+                                        'No info available'}
                                 </p>
                             </div>
 
@@ -131,11 +157,9 @@ function Cart() {
                                 <div className="flex justify-between font-medium">
                                     <p className="text-gray-900">Total</p>
                                     <p className="text-gray-900">
-                                        ₹{(
-                                            cart.total +
-                                            (cart.total >= 1000 ? 0 : 79) +
-                                            (cart.total * 0.05)
-                                        ).toFixed(2)}
+                                        {hasValidPricing ? 
+                                            `₹${cart.pricing.total.toFixed(2)}` : 
+                                            'No info available'}
                                     </p>
                                 </div>
                             </div>

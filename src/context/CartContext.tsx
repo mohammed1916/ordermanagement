@@ -1,85 +1,129 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getCartFromFirestore, saveCartToFirestore } from '@/lib/firestore/cart';
-import { CartItem, Product } from '@/types';
+import { cartService } from '@/lib/firestore/services';
+import { Cart, CartItem } from '@/lib/firestore/schemas';
+import { Product } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 
-interface CartState {
-  items: CartItem[];
-  total: number;
-}
-
 interface CartContextType {
-  cart: CartState;
-  addToCart: (product: Product, quantity: number, size: string, color: string) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  clearCart: () => void;
+  cart: Cart | null;
+  addToCart: (product: Product, quantity: number, size: string, color: string) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
   isLoading: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const [cart, setCart] = useState<CartState>({ items: [], total: 0 });
+  const { user, isLoading: authLoading } = useAuth();
+  const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchCart = async () => {
+      // Wait for authentication to complete
+      if (authLoading) {
+        return;
+      }
+      
       if (user) {
+        console.log('Fetching cart for authenticated user:', user.id);
         setIsLoading(true);
-        const fetchedCart = await getCartFromFirestore(user.id);
-        if (fetchedCart) {
-          setCart(fetchedCart);
-        } else {
-          setCart({ items: [], total: 0 });
+        try {
+          const fetchedCart = await cartService.getUserCart(user.id);
+          if (fetchedCart && fetchedCart.items && fetchedCart.items.length > 0) {
+            setCart(fetchedCart);
+          } else {
+            setCart(null);
+          }
+        } catch (error) {
+          console.error('Error fetching cart:', error);
+          setCart(null);
         }
+        setIsLoading(false);
+      } else {
+        console.log('No user authenticated, clearing cart');
+        setCart(null);
         setIsLoading(false);
       }
     };
     fetchCart();
-  }, [user]);
+  }, [user, authLoading]);
 
-  const updateFirestoreCart = async (updatedItems: CartItem[]) => {
-    const total = updatedItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    const newCart = { items: updatedItems, total };
-    setCart(newCart);
-    if (user) await saveCartToFirestore(user.id, newCart);
-  };
+  const addToCart = async (product: Product, quantity: number, size: string, color: string) => {
+    if (!user) return;
 
-  const addToCart = (product: Product, quantity: number, size: string, color: string) => {
-    const existingIndex = cart.items.findIndex(
-      (item) =>
-        item.product.id === product.id && item.size === size && item.color === color
-    );
+    try {
+      const cartItem: Omit<CartItem, 'id' | 'addedAt'> = {
+        productId: product.id,
+        productName: product.name,
+        productSku: product.id, // Use product ID as SKU fallback
+        quantity,
+        size,
+        color,
+        unitPrice: product.price,
+        totalPrice: product.price * quantity,
+        productImage: product.images[0] || '',
+        availability: product.inStock ? 'in_stock' : 'out_of_stock'
+      };
 
-    const updatedItems = [...cart.items];
-
-    if (existingIndex >= 0) {
-      updatedItems[existingIndex].quantity += quantity;
-    } else {
-      updatedItems.push({ product, quantity, size, color });
+      await cartService.addToCart(user.id, cartItem);
+      
+      // Refresh cart data
+      const updatedCart = await cartService.getUserCart(user.id);
+      setCart(updatedCart);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
     }
-
-    updateFirestoreCart(updatedItems);
   };
 
-  const removeFromCart = (productId: string) => {
-    const updatedItems = cart.items.filter(item => item.product.id !== productId);
-    updateFirestoreCart(updatedItems);
+  const removeFromCart = async (productId: string) => {
+    if (!user || !cart) return;
+
+    try {
+      // Find the item to remove
+      const itemToRemove = cart.items.find((item: CartItem) => item.productId === productId);
+      if (itemToRemove) {
+        await cartService.removeFromCart(user.id, itemToRemove.id);
+        
+        // Refresh cart data
+        const updatedCart = await cartService.getUserCart(user.id);
+        setCart(updatedCart);
+      }
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+    }
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    const updatedItems = cart.items.map(item =>
-      item.product.id === productId ? { ...item, quantity } : item
-    );
-    updateFirestoreCart(updatedItems);
+  const updateQuantity = async (productId: string, quantity: number) => {
+    if (!user || !cart) return;
+
+    try {
+      // Find the item to update
+      const itemToUpdate = cart.items.find((item: CartItem) => item.productId === productId);
+      if (itemToUpdate) {
+        await cartService.updateCartItemQuantity(user.id, itemToUpdate.id, quantity);
+        
+        // Refresh cart data
+        const updatedCart = await cartService.getUserCart(user.id);
+        setCart(updatedCart);
+      }
+    } catch (error) {
+      console.error('Error updating cart quantity:', error);
+    }
   };
 
-  const clearCart = () => {
-    setCart({ items: [], total: 0 });
-    if (user) saveCartToFirestore(user.id, { items: [], total: 0 });
+  const clearCart = async () => {
+    if (!user) return;
+
+    try {
+      await cartService.clearCart(user.id);
+      setCart(null);
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+    }
   };
 
   return (

@@ -5,6 +5,7 @@ import {
   getDoc, 
   getDocs, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   query, 
@@ -40,6 +41,8 @@ export abstract class BaseFirestoreService<T extends BaseDocument> {
   // Create a new document
   async create(data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      console.log(`Creating document in ${this.collectionName} collection:`, data);
+      
       const docData = {
         ...data,
         createdAt: serverTimestamp(),
@@ -47,9 +50,30 @@ export abstract class BaseFirestoreService<T extends BaseDocument> {
       };
       
       const docRef = await addDoc(this.getCollection(), docData);
+      console.log(`Document created successfully in ${this.collectionName} with ID:`, docRef.id);
       return docRef.id;
     } catch (error) {
       console.error(`Error creating document in ${this.collectionName}:`, error);
+      throw error;
+    }
+  }
+
+  // Create a new document with specific ID
+  async createWithId(id: string, data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+    try {
+      console.log(`Creating document in ${this.collectionName} collection with ID ${id}:`, data);
+      
+      const docData = {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      
+      const docRef = this.getDocRef(id);
+      await setDoc(docRef, docData);
+      console.log(`Document created successfully in ${this.collectionName} with ID:`, id);
+    } catch (error) {
+      console.error(`Error creating document in ${this.collectionName} with ID ${id}:`, error);
       throw error;
     }
   }

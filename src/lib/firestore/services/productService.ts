@@ -1,5 +1,5 @@
 // Product service for handling product-related Firestore operations
-import { query, where, orderBy, limit } from 'firebase/firestore';
+import { query, where, orderBy, limit, QueryConstraint } from 'firebase/firestore';
 import { BaseFirestoreService } from './base';
 import { 
   Product, 
@@ -46,7 +46,7 @@ export class ProductService extends BaseFirestoreService<Product> {
 
   // Get active products
   async getActiveProducts(limitCount?: number): Promise<Product[]> {
-    const constraints = [
+    const constraints: QueryConstraint[] = [
       where('isActive', '==', true),
       where('inStock', '==', true),
       orderBy('createdAt', 'desc')

@@ -47,7 +47,7 @@ const Header = () => {
                             {user && 
                             <Link href="/cart" className="text-gray-600 hover:text-gray-900 relative transition-colors">
                                 Cart
-                                {cart.items.length > 0 && (
+                                {cart && cart.items && cart.items.length > 0 && (
                                     <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
                                         {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
                                     </span>
@@ -57,6 +57,13 @@ const Header = () => {
 
                             {user ? (
                                 <>
+                                    <Link
+                                        href="/orders"
+                                        className="text-gray-600 hover:text-gray-900 transition-colors"
+                                    >
+                                        Orders
+                                    </Link>
+
                                     <Link
                                         href="/account/dashboard"
                                         className="text-gray-600 hover:text-gray-900 transition-colors"

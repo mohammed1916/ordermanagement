@@ -1,10 +1,10 @@
 import React from 'react';
 import { Step } from '@/types';
-import { CartItem } from '@/types';
+import { Cart } from '@/lib/firestore/schemas';
 
 // Order Summary Component
 export const OrderSummary: React.FC<{
-    cart: { items: CartItem[] };
+    cart: Cart | null;
     formatPrice: (price: number) => string;
     subtotal: number;
     shipping: number;
@@ -16,14 +16,16 @@ export const OrderSummary: React.FC<{
             <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
             <div className="space-y-4 mb-6">
-                {cart.items.map((item) => (
-                    <div key={item.product.id} className="flex justify-between">
+                {cart && cart.items ? cart.items.map((item) => (
+                    <div key={item.productId} className="flex justify-between">
                         <div>
-                            <p>{item.product.name} <span className="text-gray-500">× {item.quantity}</span></p>
+                            <p>{item.productName} <span className="text-gray-500">× {item.quantity}</span></p>
                         </div>
-                        <p className="font-medium">{formatPrice(item.product.price * item.quantity)}</p>
+                        <p className="font-medium">{formatPrice(item.totalPrice)}</p>
                     </div>
-                ))}
+                )) : (
+                    <p className="text-gray-500">No items in cart</p>
+                )}
             </div>
 
             <div className="border-t border-gray-200 pt-4 space-y-2">

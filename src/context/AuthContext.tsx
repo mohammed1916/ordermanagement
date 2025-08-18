@@ -25,8 +25,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    console.log('AuthContext: Setting up auth state listener');
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('AuthContext: Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
       if (firebaseUser) {
+        console.log('AuthContext: Firebase user details:', {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName
+        });
         setUser({
           id: firebaseUser.uid,
           name: firebaseUser.displayName || '',
@@ -36,8 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           phoneNumber: firebaseUser.phoneNumber || null,
         });
       } else {
+        console.log('AuthContext: No user authenticated');
         setUser(null);
       }
+      console.log('AuthContext: Setting isLoading to false');
       setIsLoading(false);
     });
 

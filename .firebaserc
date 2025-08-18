@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "teemavenue-e5fb6"
-  }
+    "default": "teemavenue-e5fb6",
+    "prod": "teemavenue-e5fb6"
+  },
+  "targets": {},
+  "etags": {}
 }

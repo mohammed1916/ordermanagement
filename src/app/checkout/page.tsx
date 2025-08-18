@@ -1,8 +1,10 @@
 'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { Address, CartItem, User } from '@/types';
+import { Address, User } from '@/types';
+import { Cart, CartItem } from '@/lib/firestore/schemas';
 import {PaymentStep} from '@/components/checkout/PaymentStep';
 import { CheckoutForm } from '@/types/index';
 import {ProgressBar} from '@/components/checkout/ProgressBar';
@@ -10,7 +12,7 @@ import { OrderSummary } from '@/components/checkout/OrderSummary';
 import {Step} from '@/types/index';
 import { auth } from '@/lib/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
-import { createDelivery } from '@/lib/firestore/deliveries';
+import { processCartToOrder } from '@/lib/firestore/orderUtils';
 import withAuth from '@/components/hoc/withAuth';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
@@ -269,7 +271,7 @@ const ShippingStep: React.FC<{
 // Review Step Component (unchanged)
 const ReviewStep: React.FC<{
     formData: CheckoutForm;
-    cart: { items: CartItem[] };
+    cart: Cart | null;
     onEditStep: (step: 'phone' | 'shipping' | 'payment') => void;
     onPlaceOrder: (e: React.FormEvent) => void;
     isProcessing: boolean;
@@ -346,24 +348,26 @@ const ReviewStep: React.FC<{
                 <div>
                     <h3 className="text-lg font-medium mb-2">Order Items</h3>
                     <div className="divide-y divide-gray-200">
-                        {cart.items.map((item) => (
-                            <div key={item.product.id} className="py-4 flex items-center">
+                        {cart && cart.items ? cart.items.map((item: CartItem) => (
+                            <div key={item.productId} className="py-4 flex items-center">
                                 <div className="h-16 w-16 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
-                                    {item.product.images && item.product.images.length > 0 && (
+                                    {item.productImage && (
                                         <img
-                                            src={item.product.images[0]}
-                                            alt={item.product.name}
+                                            src={item.productImage}
+                                            alt={item.productName}
                                             className="h-full w-full object-cover"
                                         />
                                     )}
                                 </div>
                                 <div className="ml-4 flex-1">
-                                    <p className="font-medium">{item.product.name}</p>
+                                    <p className="font-medium">{item.productName}</p>
                                     <p className="text-gray-500">Quantity: {item.quantity}</p>
                                 </div>
-                                <p className="font-medium">{formatPrice(item.product.price * item.quantity)}</p>
+                                <p className="font-medium">{formatPrice(item.totalPrice)}</p>
                             </div>
-                        ))}
+                        )) : (
+                            <p className="text-gray-500 py-4">No items in cart</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -486,8 +490,8 @@ export default withAuth(function Checkout({ user }: { user: User }) {
         };
     }, [recaptchaVerifier]);
 
-    // Redirect to cart if cart is empty
-    if (cart.items.length === 0) {
+    // Redirect to cart if cart is empty or null
+    if (!cart || !cart.items || cart.items.length === 0) {
         if (typeof window !== 'undefined') {
             router.push('/cart');
         }
@@ -607,6 +611,13 @@ export default withAuth(function Checkout({ user }: { user: User }) {
 
     const handlePlaceOrder = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            console.error('User is not authenticated');
+            setIsProcessing(false);
+            return;
+        }
 
         if (!user.id) {
             console.error('User ID is missing');
@@ -617,24 +628,27 @@ export default withAuth(function Checkout({ user }: { user: User }) {
         try {
             setIsProcessing(true);
             
-            // Create delivery record
-            await createDelivery({
+            // Process cart to order using our new utility
+            const result = await processCartToOrder(currentUser, {
                 userId: user.id!,
-                items: cart.items,
-                shippingAddress: formData.shippingAddress,
-                phoneNumber: formData.phoneNumber,
-                status: 'pending',
-                subtotal,
-                shipping,
-                tax,
-                total
+                customerInfo: {
+                    name: user.name || formData.shippingAddress.fullName,
+                    email: user.email || '',
+                    phoneNumber: formData.phoneNumber
+                },
+                shippingAddress: {
+                    ...formData.shippingAddress,
+                    phone: formData.phoneNumber
+                },
+                paymentMethod: 'cash_on_delivery', // Default payment method
             });
 
-            // Clear the cart
-            clearCart();
-            
-            // Redirect to confirmation page
-            router.push('/checkout/confirmation');
+            if (result.success && result.orderId && result.orderNumber) {
+                // Redirect to success page with order details
+                router.push(`/checkout/success?orderId=${result.orderId}&orderNumber=${result.orderNumber}`);
+            } else {
+                throw new Error(result.error || 'Failed to create order');
+            }
         } catch (error) {
             console.error('Error placing order:', error);
             setIsProcessing(false);
@@ -661,8 +675,8 @@ export default withAuth(function Checkout({ user }: { user: User }) {
         window.scrollTo(0, 0);
     };
 
-    // Calculate order summary
-    const subtotal = cart.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    // Calculate order summary - cart is already validated to not be null above
+    const subtotal = cart!.items.reduce((sum, item) => sum + item.totalPrice, 0);
     const shipping = 79;
     const tax = subtotal * 0.05;
     const total = subtotal + shipping + tax;
