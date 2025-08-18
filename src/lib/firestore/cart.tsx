@@ -1,20 +1,37 @@
 // src/lib/firestore/cart.ts
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { CartItem } from '@/types';
+import { cartService } from './services';
+import { CartItem } from './schemas';
 
+// Legacy wrapper functions for backward compatibility
 export const saveCartToFirestore = async (
   userId: string,
   cart: { items: CartItem[]; total: number }
 ) => {
-  const ref = doc(db, 'carts', userId);
-  await setDoc(ref, cart);
+  // Convert legacy format to new format and use cart service
+  for (const item of cart.items) {
+    await cartService.addToCart(userId, {
+      productId: item.productId,
+      productName: item.productName,
+      productSku: item.productSku,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      productImage: item.productImage,
+      availability: item.availability || 'in_stock',
+    });
+  }
 };
 
 export const getCartFromFirestore = async (userId: string) => {
-  const ref = doc(db, 'carts', userId);
-  const snap = await getDoc(ref);
-  if (snap.exists()) return snap.data() as { items: any[]; total: number };
-  return null;
+  const cart = await cartService.getUserCart(userId);
+  if (!cart) return null;
+  
+  // Convert to legacy format for backward compatibility
+  return {
+    items: cart.items,
+    total: cart.pricing.total
+  };
 };
 

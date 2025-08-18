@@ -2,15 +2,99 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write their own cart
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Products collection - public read, admin write
+    match /products/{productId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Product categories - public read, admin write
+    match /productCategories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Product variants - public read, admin write
+    match /productVariants/{variantId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Orders collection
+    match /orders/{orderId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+        (resource.data.userId == request.auth.uid || request.auth.token.isAdmin == true);
+      allow update: if request.auth != null && request.auth.token.isAdmin == true;
+      allow delete: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Carts collection
     match /carts/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Coupons collection
+    match /coupons/{couponId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Coupon usage tracking
+    match /couponUsage/{usageId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && 
+        (resource.data.userId == request.auth.uid || request.auth.token.isAdmin == true);
+    }
+    
+    // Product reviews
+    match /productReviews/{reviewId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if resource.data.isApproved == true;
+      allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Wishlists
+    match /wishlists/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Allow authenticated users to create deliveries
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Analytics collections (admin only)
+    match /productViews/{viewId} {
+      allow create: if true; // Allow anonymous tracking
+      allow read: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    match /searchQueries/{queryId} {
+      allow create: if true; // Allow anonymous search tracking
+      allow read: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Inventory transactions (admin only)
+    match /inventoryTransactions/{transactionId} {
+      allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    
+    // Legacy collections for backward compatibility
     match /deliveries/{deliveryId} {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.isAdmin == true);
+      allow read: if request.auth != null && 
+        (resource.data.userId == request.auth.uid || request.auth.token.isAdmin == true);
       allow update, delete: if request.auth != null && request.auth.token.isAdmin == true;
     }
   }
