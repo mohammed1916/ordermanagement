@@ -491,11 +491,22 @@ export default withAuth(function Checkout({ user }: { user: User }) {
     }, [recaptchaVerifier]);
 
     // Redirect to cart if cart is empty or null
-    if (!cart || !cart.items || cart.items.length === 0) {
-        if (typeof window !== 'undefined') {
+    React.useEffect(() => {
+        if (!cart || !cart.items || cart.items.length === 0) {
             router.push('/cart');
         }
-        return null;
+    }, [cart, router]);
+
+    // Show loading or return null while redirecting
+    if (!cart || !cart.items || cart.items.length === 0) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Redirecting to cart...</p>
+                </div>
+            </div>
+        );
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
