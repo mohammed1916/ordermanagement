@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { orderService } from '@/lib/firestore/services';
 import { Order, OrderStatus } from '@/lib/firestore/schemas';
+import { ConfirmModal, AlertModal, useModal } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
@@ -48,6 +50,12 @@ const OrdersPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Modal hooks
+  const confirmModal = useModal();
+  const alertModal = useModal();
+  const toast = useToast();
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -155,16 +163,54 @@ const OrdersPage = () => {
     return ['pending', 'paid', 'processing'].includes(order.status);
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!confirm('Are you sure you want to cancel this order?')) return;
-    
-    try {
-      await orderService.cancelOrder(orderId, 'Cancelled by customer', user?.id);
-      await fetchOrders(); // Refresh orders
-    } catch (err) {
-      console.error('Error cancelling order:', err);
-      alert('Failed to cancel order. Please try again.');
+  const showConfirm = (title: string, message: string, onConfirm: () => void, orderId?: string) => {
+    confirmModal.openModal({ title, message, onConfirm, orderId });
+  };
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    alertModal.openModal({ title, message, type });
+  };
+
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    switch (type) {
+      case 'success':
+        toast.success(title, message);
+        break;
+      case 'error':
+        toast.error(title, message);
+        break;
+      case 'warning':
+        toast.warning(title, message);
+        break;
+      case 'info':
+        toast.info(title, message);
+        break;
     }
+  };
+
+  const handleCancelOrder = async (orderId: string, orderNumber: string) => {
+    showConfirm(
+      'Cancel Order',
+      `Are you sure you want to cancel order #${orderNumber}? This action cannot be undone.`,
+      async () => {
+        try {
+          setIsCancelling(true);
+          await orderService.cancelOrder(orderId, 'Cancelled by customer', user?.id);
+          await fetchOrders();
+          confirmModal.closeModal();
+          // Use toast for success message (less intrusive)
+          showToast('Order Cancelled', 'Your order has been successfully cancelled.', 'success');
+        } catch (err) {
+          console.error('Error cancelling order:', err);
+          confirmModal.closeModal();
+          // Use modal for error (more attention-grabbing)
+          showAlert('Cancellation Failed', 'Failed to cancel order. Please try again or contact support.', 'error');
+        } finally {
+          setIsCancelling(false);
+        }
+      },
+      orderId
+    );
   };
 
   if (authLoading || !user) {
@@ -386,11 +432,16 @@ const OrdersPage = () => {
                     
                     {canCancelOrder(order) && (
                       <button
-                        onClick={() => handleCancelOrder(order.id!)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200"
+                        onClick={() => handleCancelOrder(order.id!, order.orderNumber)}
+                        disabled={isCancelling}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <FiX className="w-4 h-4" />
-                        Cancel Order
+                        {isCancelling ? (
+                          <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <FiX className="w-4 h-4" />
+                        )}
+                        {isCancelling ? 'Cancelling...' : 'Cancel Order'}
                       </button>
                     )}
                     
@@ -407,6 +458,29 @@ const OrdersPage = () => {
           )}
         </motion.div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={confirmModal.closeModal}
+        onConfirm={confirmModal.modalData?.onConfirm || (() => {})}
+        title={confirmModal.modalData?.title || ''}
+        message={confirmModal.modalData?.message || ''}
+        confirmText="Yes, Cancel Order"
+        cancelText="Keep Order"
+        type="danger"
+        isLoading={isCancelling}
+        loadingText="Cancelling..."
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={alertModal.closeModal}
+        title={alertModal.modalData?.title || ''}
+        message={alertModal.modalData?.message || ''}
+        type={alertModal.modalData?.type || 'info'}
+      />
     </div>
   );
 };

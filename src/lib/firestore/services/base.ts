@@ -108,8 +108,20 @@ export abstract class BaseFirestoreService<T extends BaseDocument> {
       };
       
       await updateDoc(docRef, updateData);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error updating document in ${this.collectionName}:`, error);
+      
+      // Provide more specific error messages
+      if (error?.code === 'permission-denied') {
+        throw new Error(`Permission denied: You don't have access to update this ${this.collectionName.slice(0, -1)}.`);
+      } else if (error?.code === 'not-found') {
+        throw new Error(`${this.collectionName.slice(0, -1).charAt(0).toUpperCase() + this.collectionName.slice(1, -1)} not found.`);
+      } else if (error?.code === 'unavailable') {
+        throw new Error('Network error: Please check your internet connection and try again.');
+      } else if (error?.code === 'unauthenticated') {
+        throw new Error('Authentication required: Please log in again.');
+      }
+      
       throw error;
     }
   }

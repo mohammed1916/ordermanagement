@@ -32,8 +32,44 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow read: if request.auth != null && 
         (resource.data.userId == request.auth.uid || request.auth.token.isAdmin == true);
-      allow update: if request.auth != null && request.auth.token.isAdmin == true;
+      
+      // Allow updates for:
+      // 1. Admins (full access)
+      // 2. Order owners for cancellation only (with strict conditions)
+      allow update: if request.auth != null && (
+        // Admin has full update access
+        request.auth.token.isAdmin == true ||
+        
+        // Order owner can only cancel their own orders with specific conditions
+        (resource.data.userId == request.auth.uid && 
+         isValidOrderCancellation(resource.data, request.resource.data))
+      );
+      
       allow delete: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+
+    // Helper function to validate order cancellation
+    function isValidOrderCancellation(existingOrder, updatedOrder) {
+      return 
+        // Order must be in a cancellable status
+        existingOrder.status in ['pending', 'paid', 'processing'] &&
+        
+        // Status must be changed to cancelled
+        updatedOrder.status == 'cancelled' &&
+        
+        // Critical fields cannot be modified by customer
+        existingOrder.userId == updatedOrder.userId &&
+        existingOrder.pricing == updatedOrder.pricing &&
+        existingOrder.items == updatedOrder.items &&
+        existingOrder.shippingAddress == updatedOrder.shippingAddress &&
+        existingOrder.orderNumber == updatedOrder.orderNumber &&
+        existingOrder.createdAt == updatedOrder.createdAt &&
+        
+        // Timeline must be extended (not replaced)
+        updatedOrder.timeline.size() >= existingOrder.timeline.size() &&
+        
+        // New timeline entry must be a cancellation
+        updatedOrder.timeline[updatedOrder.timeline.size() - 1].status == 'cancelled';
     }
     
     // Carts collection

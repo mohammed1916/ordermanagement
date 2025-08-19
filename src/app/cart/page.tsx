@@ -1,13 +1,48 @@
 // src/app/cart/page.tsx
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import withAuth from '@/components/hoc/withAuth';
 
 function Cart() {
     const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
+    const [isUpdating, setIsUpdating] = useState<string | null>(null); // Track which item is being updated
+    const [error, setError] = useState<string | null>(null);
+
+    // Handle quantity update with error handling
+    const handleQuantityUpdate = async (productId: string, newQuantity: number) => {
+        try {
+            setIsUpdating(productId);
+            setError(null);
+            await updateQuantity(productId, newQuantity);
+        } catch (error) {
+            console.error('Error updating quantity:', error);
+            setError('Failed to update quantity. Please try again.');
+        } finally {
+            setIsUpdating(null);
+        }
+    };
+
+    // Handle item removal with error handling
+    const handleRemoveItem = async (productId: string) => {
+        try {
+            setIsUpdating(productId);
+            setError(null);
+            await removeFromCart(productId);
+        } catch (error) {
+            console.error('Error removing item:', error);
+            setError('Failed to remove item. Please try again.');
+        } finally {
+            setIsUpdating(null);
+        }
+    };
+
+function Cart() {
+    const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
+
+    };
 
     // Early return for loading state
     if (isLoading) {
@@ -42,6 +77,36 @@ function Cart() {
     return (
         <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
+
+            {/* Error Message */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-800">{error}</p>
+                        </div>
+                        <div className="ml-auto pl-3">
+                            <div className="-mx-1.5 -my-1.5">
+                                <button
+                                    onClick={() => setError(null)}
+                                    className="inline-flex bg-red-50 rounded-md p-1.5 text-red-500 hover:bg-red-100"
+                                    title="Close error message"
+                                    aria-label="Close error message"
+                                >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Cart Items */}
@@ -81,26 +146,44 @@ function Cart() {
                                                 {/* Quantity Selector */}
                                                 <div className="flex items-center border border-gray-300 rounded-md">
                                                     <button
-                                                        onClick={() => updateQuantity(item.productId, Math.max(1, item.quantity - 1))}
-                                                        className="px-3 py-1 text-gray-600 hover:bg-gray-100"
+                                                        onClick={() => handleQuantityUpdate(item.productId, Math.max(1, item.quantity - 1))}
+                                                        disabled={isUpdating === item.productId}
+                                                        className="px-3 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        -
+                                                        {isUpdating === item.productId ? (
+                                                            <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+                                                        ) : (
+                                                            '-'
+                                                        )}
                                                     </button>
                                                     <span className="px-3 py-1">{item.quantity}</span>
                                                     <button
-                                                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                                                        className="px-3 py-1 text-gray-600 hover:bg-gray-100"
+                                                        onClick={() => handleQuantityUpdate(item.productId, item.quantity + 1)}
+                                                        disabled={isUpdating === item.productId}
+                                                        className="px-3 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        +
+                                                        {isUpdating === item.productId ? (
+                                                            <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+                                                        ) : (
+                                                            '+'
+                                                        )}
                                                     </button>
                                                 </div>
 
                                                 {/* Remove Button */}
                                                 <button
-                                                    onClick={() => removeFromCart(item.productId)}
-                                                    className="text-sm font-medium text-red-600 hover:text-red-500"
+                                                    onClick={() => handleRemoveItem(item.productId)}
+                                                    disabled={isUpdating === item.productId}
+                                                    className="text-sm font-medium text-red-600 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
-                                                    Remove
+                                                    {isUpdating === item.productId ? (
+                                                        <div className="flex items-center">
+                                                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                                            Removing...
+                                                        </div>
+                                                    ) : (
+                                                        'Remove'
+                                                    )}
                                                 </button>
                                             </div>
                                         </div>

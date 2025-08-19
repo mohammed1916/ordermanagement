@@ -52,8 +52,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCart();
   }, [user, authLoading]);
 
-  const addToCart = async (product: Product, quantity: number, size: string, color: string) => {
-    if (!user) return;
+  const addToCart = async (product: Product, quantity: number, size: string, color: string): Promise<void> => {
+    if (!user) {
+      throw new Error('User must be logged in to add items to cart');
+    }
 
     try {
       const cartItem: Omit<CartItem, 'id' | 'addedAt'> = {
@@ -76,53 +78,71 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCart(updatedCart);
     } catch (error) {
       console.error('Error adding to cart:', error);
+      throw error; // Re-throw to allow caller to handle
     }
   };
 
-  const removeFromCart = async (productId: string) => {
-    if (!user || !cart) return;
+  const removeFromCart = async (productId: string): Promise<void> => {
+    if (!user || !cart) {
+      throw new Error('User must be logged in and have a cart to remove items');
+    }
 
     try {
       // Find the item to remove
       const itemToRemove = cart.items.find((item: CartItem) => item.productId === productId);
-      if (itemToRemove) {
-        await cartService.removeFromCart(user.id, itemToRemove.id);
-        
-        // Refresh cart data
-        const updatedCart = await cartService.getUserCart(user.id);
-        setCart(updatedCart);
+      if (!itemToRemove) {
+        throw new Error('Item not found in cart');
       }
+
+      await cartService.removeFromCart(user.id, itemToRemove.id);
+      
+      // Refresh cart data
+      const updatedCart = await cartService.getUserCart(user.id);
+      setCart(updatedCart);
     } catch (error) {
       console.error('Error removing from cart:', error);
+      throw error; // Re-throw to allow caller to handle
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
-    if (!user || !cart) return;
+  const updateQuantity = async (productId: string, quantity: number): Promise<void> => {
+    if (!user || !cart) {
+      throw new Error('User must be logged in and have a cart to update quantities');
+    }
+
+    if (quantity < 1) {
+      throw new Error('Quantity must be at least 1');
+    }
 
     try {
       // Find the item to update
       const itemToUpdate = cart.items.find((item: CartItem) => item.productId === productId);
-      if (itemToUpdate) {
-        await cartService.updateCartItemQuantity(user.id, itemToUpdate.id, quantity);
-        
-        // Refresh cart data
-        const updatedCart = await cartService.getUserCart(user.id);
-        setCart(updatedCart);
+      if (!itemToUpdate) {
+        throw new Error('Item not found in cart');
       }
+
+      await cartService.updateCartItemQuantity(user.id, itemToUpdate.id, quantity);
+      
+      // Refresh cart data
+      const updatedCart = await cartService.getUserCart(user.id);
+      setCart(updatedCart);
     } catch (error) {
       console.error('Error updating cart quantity:', error);
+      throw error; // Re-throw to allow caller to handle
     }
   };
 
-  const clearCart = async () => {
-    if (!user) return;
+  const clearCart = async (): Promise<void> => {
+    if (!user) {
+      throw new Error('User must be logged in to clear cart');
+    }
 
     try {
       await cartService.clearCart(user.id);
       setCart(null);
     } catch (error) {
       console.error('Error clearing cart:', error);
+      throw error; // Re-throw to allow caller to handle
     }
   };
 

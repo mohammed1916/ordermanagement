@@ -4,6 +4,7 @@ import Header from '@/components/layouts/Header';
 import Footer from '@/components/layouts/Footer';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { ToastProvider } from '@/components/ui/Toast';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -23,13 +24,15 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <CartProvider>
-            <div className="min-h-screen flex flex-col">
-              <Header />
-              <main className="flex-grow container mx-auto px-4 py-8">
-                {children}
-              </main>
-              <Footer />
-            </div>
+            <ToastProvider>
+              <div className="min-h-screen flex flex-col">
+                <Header />
+                <main className="flex-grow container mx-auto px-4 py-8">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </ToastProvider>
           </CartProvider>
         </AuthProvider>
       </body>

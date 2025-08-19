@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { orderService } from '@/lib/firestore/services';
 import { Order, OrderTimeline } from '@/lib/firestore/schemas';
+import { ConfirmModal, AlertModal, useModal } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -24,6 +26,34 @@ import {
   FiCreditCard
 } from 'react-icons/fi';
 
+// Safe date formatting utility
+const formatOrderDate = (date: any, formatStr: string = 'PPP'): string => {
+  try {
+    if (!date) return 'Date not available';
+    
+    // Handle Firestore Timestamp
+    if (date && typeof date === 'object' && date.toDate) {
+      return format(date.toDate(), formatStr);
+    }
+    
+    // Handle Date object or string
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Date not available';
+    }
+    
+    return format(dateObj, formatStr);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Date not available';
+  }
+};
+
+// Network connectivity check
+const checkNetworkConnectivity = (): boolean => {
+  return navigator.onLine;
+};
+
 const OrderDetailPage = () => {
   const params = useParams();
   const router = useRouter();
@@ -31,6 +61,12 @@ const OrderDetailPage = () => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Modal hooks
+  const confirmModal = useModal();
+  const alertModal = useModal();
+  const toast = useToast();
 
   const orderId = params?.orderId as string;
 
@@ -97,16 +133,98 @@ const OrderDetailPage = () => {
     }
   };
 
-  const handleCancelOrder = async () => {
-    if (!order || !confirm('Are you sure you want to cancel this order?')) return;
-    
-    try {
-      await orderService.cancelOrder(order.id!, 'Cancelled by customer', user?.id);
-      await fetchOrder(); // Refresh order
-    } catch (err) {
-      console.error('Error cancelling order:', err);
-      alert('Failed to cancel order. Please try again.');
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    confirmModal.openModal({ title, message, onConfirm });
+  };
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    alertModal.openModal({ title, message, type });
+  };
+
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    switch (type) {
+      case 'success':
+        toast.success(title, message);
+        break;
+      case 'error':
+        toast.error(title, message);
+        break;
+      case 'warning':
+        toast.warning(title, message);
+        break;
+      case 'info':
+        toast.info(title, message);
+        break;
     }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || !user) return;
+    
+    showConfirm(
+      'Cancel Order',
+      `Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.`,
+      async () => {
+        // Check network connectivity first
+        if (!checkNetworkConnectivity()) {
+          confirmModal.closeModal();
+          showAlert(
+            'Connection Error',
+            'No internet connection detected. Please check your network connection and try again.',
+            'error'
+          );
+          return;
+        }
+        
+        setIsCancelling(true);
+        
+        try {
+          // Check if user is still authenticated
+          if (!user.id) {
+            throw new Error('Authentication required. Please log in again.');
+          }
+
+          await orderService.cancelOrder(order.id!, 'Cancelled by customer', user.id);
+          
+          // Close confirmation modal and show success toast
+          confirmModal.closeModal();
+          showToast('Order Cancelled', 'Your order has been successfully cancelled.', 'success');
+          
+          // Refresh order data
+          await fetchOrder();
+          
+        } catch (err: any) {
+          console.error('Error cancelling order:', err);
+          
+          let errorTitle = 'Cancellation Failed';
+          let errorMessage = 'Failed to cancel order. ';
+          
+          // Handle different types of errors
+          if (err?.message?.includes('auth') || err?.message?.includes('permission') || err?.code === 'unauthenticated') {
+            errorTitle = 'Authentication Error';
+            errorMessage = 'Authentication issue detected. Please refresh the page and log in again.';
+          } else if (err?.message?.includes('network') || err?.code === 'unavailable' || !checkNetworkConnectivity()) {
+            errorTitle = 'Network Error';
+            errorMessage = 'Network error detected. Please check your internet connection and try again.';
+          } else if (err?.message?.includes('not found') || err?.code === 'not-found') {
+            errorTitle = 'Order Not Found';
+            errorMessage = 'Order not found. The page will refresh automatically.';
+            setTimeout(() => window.location.reload(), 3000);
+          } else if (err?.code === 'permission-denied') {
+            errorTitle = 'Permission Denied';
+            errorMessage = 'You do not have permission to cancel this order.';
+          } else {
+            errorMessage = 'Please try again later or contact support if the issue persists.';
+          }
+          
+          // Close confirmation modal and show error
+          confirmModal.closeModal();
+          showAlert(errorTitle, errorMessage, 'error');
+        } finally {
+          setIsCancelling(false);
+        }
+      }
+    );
   };
 
   if (authLoading) {
@@ -180,16 +298,28 @@ const OrderDetailPage = () => {
               Order #{order.orderNumber}
             </h1>
             <p className="text-gray-600">
-              Placed on {format(new Date(order.createdAt as any || Date.now()), 'PPPp')}
+              Placed on {formatOrderDate(order.createdAt, 'PPPp')}
             </p>
           </div>
           <div className="mt-4 md:mt-0 space-x-3">
             {canCancelOrder && (
               <button
                 onClick={handleCancelOrder}
-                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+                disabled={isCancelling}
+                className={`px-6 py-3 rounded-lg transition-colors duration-200 ${
+                  isCancelling 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } text-white`}
               >
-                Cancel Order
+                {isCancelling ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline mr-2"></div>
+                    Cancelling...
+                  </>
+                ) : (
+                  'Cancel Order'
+                )}
               </button>
             )}
             {order.status === 'delivered' && (
@@ -266,7 +396,7 @@ const OrderDetailPage = () => {
                       </p>
                       <p className="text-sm text-gray-600">{timeline.message}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {format(new Date(timeline.timestamp), 'PPp')}
+                        {formatOrderDate(timeline.timestamp, 'PPp')}
                       </p>
                     </div>
                   </div>
@@ -410,7 +540,7 @@ const OrderDetailPage = () => {
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Estimated Delivery</p>
                     <p className="font-medium text-gray-900">
-                      {format(new Date(order.shipping.estimatedDelivery), 'PPP')}
+                      {formatOrderDate(order.shipping.estimatedDelivery, 'PPP')}
                     </p>
                   </div>
                 </div>
@@ -419,6 +549,29 @@ const OrderDetailPage = () => {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={confirmModal.closeModal}
+        onConfirm={confirmModal.modalData?.onConfirm || (() => {})}
+        title={confirmModal.modalData?.title || ''}
+        message={confirmModal.modalData?.message || ''}
+        confirmText="Yes, Cancel Order"
+        cancelText="Keep Order"
+        type="danger"
+        isLoading={isCancelling}
+        loadingText="Cancelling..."
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={alertModal.closeModal}
+        title={alertModal.modalData?.title || ''}
+        message={alertModal.modalData?.message || ''}
+        type={alertModal.modalData?.type || 'info'}
+      />
     </div>
   );
 };

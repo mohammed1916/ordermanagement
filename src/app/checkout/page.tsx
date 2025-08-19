@@ -27,7 +27,8 @@ const PhoneVerificationStep: React.FC<{
     isOtpSent: boolean;
     isVerifying: boolean;
     verificationError: string;
-}> = ({ formData, onInputChange, onSubmit, onVerifyOtp, isOtpSent, isVerifying, verificationError }) => {
+    resetRecaptcha: () => Promise<void>;
+}> = ({ formData, onInputChange, onSubmit, onVerifyOtp, isOtpSent, isVerifying, verificationError, resetRecaptcha }) => {
     const handlePhoneChange = (value: string) => {
         // Create a synthetic event to match the expected type
         const event = {
@@ -83,11 +84,26 @@ const PhoneVerificationStep: React.FC<{
                     {/* reCAPTCHA container */}
                     <div id="recaptcha-container"></div>
                     
+                    {verificationError && (
+                        <button
+                            type="button"
+                            onClick={resetRecaptcha}
+                            className="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 font-medium text-sm mb-2"
+                        >
+                            Reset reCAPTCHA
+                        </button>
+                    )}
+                    
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 font-medium"
+                        disabled={isVerifying}
+                        className={`w-full py-3 px-4 rounded-md font-medium ${
+                            isVerifying
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                        } text-white`}
                     >
-                        Send Verification Code
+                        {isVerifying ? 'Sending...' : 'Send Verification Code'}
                     </button>
                 </form>
             ) : (
@@ -470,22 +486,47 @@ export default withAuth(function Checkout({ user }: { user: User }) {
     // Initialize reCAPTCHA when component mounts
     React.useEffect(() => {
         if (!recaptchaVerifier) {
-            const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                size: 'normal',
-                callback: () => {
-                    // reCAPTCHA solved
-                },
-                'expired-callback': () => {
-                    setVerificationError('reCAPTCHA expired. Please try again.');
-                }
-            });
-            setRecaptchaVerifier(verifier);
+            try {
+                const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    size: 'normal',
+                    theme: 'light',
+                    callback: () => {
+                        // reCAPTCHA solved
+                        console.log('reCAPTCHA solved successfully');
+                    },
+                    'expired-callback': () => {
+                        console.log('reCAPTCHA expired');
+                        setVerificationError('reCAPTCHA expired. Please try again.');
+                    },
+                    'error-callback': (error: any) => {
+                        console.error('reCAPTCHA error:', error);
+                        setVerificationError('reCAPTCHA failed to load. Please check your internet connection.');
+                    }
+                });
+                
+                // Render the reCAPTCHA
+                verifier.render().then(() => {
+                    console.log('reCAPTCHA rendered successfully');
+                }).catch((error: any) => {
+                    console.error('Error rendering reCAPTCHA:', error);
+                    setVerificationError('Failed to load reCAPTCHA. Please refresh the page.');
+                });
+                
+                setRecaptchaVerifier(verifier);
+            } catch (error: any) {
+                console.error('Error initializing reCAPTCHA:', error);
+                setVerificationError('Failed to initialize reCAPTCHA. Please refresh the page.');
+            }
         }
 
         // Cleanup
         return () => {
             if (recaptchaVerifier) {
-                recaptchaVerifier.clear();
+                try {
+                    recaptchaVerifier.clear();
+                } catch (error) {
+                    console.error('Error clearing reCAPTCHA:', error);
+                }
             }
         };
     }, [recaptchaVerifier]);
@@ -532,9 +573,11 @@ export default withAuth(function Checkout({ user }: { user: User }) {
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setVerificationError('');
+        setIsVerifying(true);
 
         if (!recaptchaVerifier) {
             setVerificationError('reCAPTCHA not initialized. Please refresh the page.');
+            setIsVerifying(false);
             return;
         }
 
@@ -544,31 +587,71 @@ export default withAuth(function Checkout({ user }: { user: User }) {
             // Validate phone number format
             if (!phoneNumber.startsWith('+')) {
                 setVerificationError('Please enter phone number with country code (e.g., +91)');
+                setIsVerifying(false);
                 return;
             }
 
-            const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+            // Add timeout to the phone verification request
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout')), 30000); // 30 seconds timeout
+            });
+
+            const signInPromise = signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+
+            const confirmation = await Promise.race([signInPromise, timeoutPromise]) as ConfirmationResult;
             setConfirmationResult(confirmation);
             setIsOtpSent(true);
+            console.log('OTP sent successfully');
+            
         } catch (error: any) {
             console.error('Error sending OTP:', error);
             
-            if (error.code === 'auth/invalid-phone-number') {
-                setVerificationError('Invalid phone number format. Please include country code.');
+            let errorMessage = 'Failed to send verification code. Please try again.';
+            
+            if (error.message === 'Request timeout') {
+                errorMessage = 'Request timed out. Please check your internet connection and try again.';
+            } else if (error.code === 'auth/invalid-phone-number') {
+                errorMessage = 'Invalid phone number format. Please include country code.';
             } else if (error.code === 'auth/too-many-requests') {
-                setVerificationError('Too many attempts. Please try again later.');
-            } else {
-                setVerificationError('Failed to send verification code. Please try again.');
+                errorMessage = 'Too many attempts. Please try again later.';
+            } else if (error.code === 'auth/quota-exceeded') {
+                errorMessage = 'SMS quota exceeded. Please try again later.';
+            } else if (error.code === 'auth/app-not-authorized') {
+                errorMessage = 'App not authorized for phone authentication. Please contact support.';
+            } else if (error.code === 'auth/captcha-check-failed') {
+                errorMessage = 'reCAPTCHA verification failed. Please try again.';
             }
             
-            // Reset reCAPTCHA
-            if (recaptchaVerifier) {
-                recaptchaVerifier.clear();
-                const newVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                    size: 'normal'
-                });
-                setRecaptchaVerifier(newVerifier);
+            setVerificationError(errorMessage);
+            
+            // Reset reCAPTCHA on error
+            try {
+                if (recaptchaVerifier) {
+                    recaptchaVerifier.clear();
+                    const newVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                        size: 'normal',
+                        theme: 'light',
+                        callback: () => {
+                            console.log('reCAPTCHA solved successfully');
+                        },
+                        'expired-callback': () => {
+                            setVerificationError('reCAPTCHA expired. Please try again.');
+                        },
+                        'error-callback': (error: any) => {
+                            console.error('reCAPTCHA error:', error);
+                            setVerificationError('reCAPTCHA failed to load. Please check your internet connection.');
+                        }
+                    });
+                    
+                    // Render the new reCAPTCHA
+                    await newVerifier.render();
+                    setRecaptchaVerifier(newVerifier);
+                }
+            } catch (recaptchaError) {
+                console.error('Error resetting reCAPTCHA:', recaptchaError);
             }
+        } finally {
+            setIsVerifying(false);
         }
     };
 
@@ -590,21 +673,74 @@ export default withAuth(function Checkout({ user }: { user: User }) {
         }
 
         try {
-            await confirmationResult.confirm(formData.otpCode);
+            // Add timeout to the OTP verification request
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Verification timeout')), 15000); // 15 seconds timeout
+            });
+
+            const verificationPromise = confirmationResult.confirm(formData.otpCode);
+            
+            await Promise.race([verificationPromise, timeoutPromise]);
+            
             setStep('shipping');
             window.scrollTo(0, 0);
+            console.log('OTP verified successfully');
+            
         } catch (error: any) {
             console.error('Error verifying OTP:', error);
             
-            if (error.code === 'auth/invalid-verification-code') {
-                setVerificationError('Invalid verification code. Please check and try again.');
+            let errorMessage = 'Verification failed. Please try again.';
+            
+            if (error.message === 'Verification timeout') {
+                errorMessage = 'Verification timed out. Please check your internet connection and try again.';
+            } else if (error.code === 'auth/invalid-verification-code') {
+                errorMessage = 'Invalid verification code. Please check and try again.';
             } else if (error.code === 'auth/code-expired') {
-                setVerificationError('Verification code expired. Please request a new one.');
-            } else {
-                setVerificationError('Verification failed. Please try again.');
+                errorMessage = 'Verification code expired. Please request a new one.';
+            } else if (error.code === 'auth/too-many-requests') {
+                errorMessage = 'Too many verification attempts. Please try again later.';
+            } else if (error.code === 'auth/session-expired') {
+                errorMessage = 'Session expired. Please request a new verification code.';
             }
+            
+            setVerificationError(errorMessage);
         } finally {
             setIsVerifying(false);
+        }
+    };
+
+    const resetRecaptcha = async () => {
+        if (recaptchaVerifier) {
+            try {
+                recaptchaVerifier.clear();
+            } catch (error) {
+                console.error('Error clearing reCAPTCHA:', error);
+            }
+        }
+
+        try {
+            const newVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                size: 'normal',
+                theme: 'light',
+                callback: () => {
+                    console.log('reCAPTCHA solved successfully');
+                },
+                'expired-callback': () => {
+                    setVerificationError('reCAPTCHA expired. Please try again.');
+                },
+                'error-callback': (error: any) => {
+                    console.error('reCAPTCHA error:', error);
+                    setVerificationError('reCAPTCHA failed to load. Please refresh the page.');
+                }
+            });
+
+            await newVerifier.render();
+            setRecaptchaVerifier(newVerifier);
+            setVerificationError('');
+            console.log('reCAPTCHA reset successfully');
+        } catch (error) {
+            console.error('Error resetting reCAPTCHA:', error);
+            setVerificationError('Failed to reset reCAPTCHA. Please refresh the page.');
         }
     };
 
@@ -713,6 +849,7 @@ export default withAuth(function Checkout({ user }: { user: User }) {
                             isOtpSent={isOtpSent}
                             isVerifying={isVerifying}
                             verificationError={verificationError}
+                            resetRecaptcha={resetRecaptcha}
                         />
                     )}
                     {step === 'shipping' && (

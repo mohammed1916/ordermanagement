@@ -8,6 +8,29 @@ import { FiCheck, FiPackage, FiTruck, FiMail } from 'react-icons/fi';
 import { orderService } from '@/lib/firestore/services';
 import { Order } from '@/lib/firestore/schemas';
 
+// Safe date formatting utility
+const formatOrderDate = (date: any): string => {
+  try {
+    if (!date) return 'Date not available';
+    
+    // Handle Firestore Timestamp
+    if (date && typeof date === 'object' && date.toDate) {
+      return date.toDate().toLocaleDateString();
+    }
+    
+    // Handle Date object or string
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Date not available';
+    }
+    
+    return dateObj.toLocaleDateString();
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Date not available';
+  }
+};
+
 const CheckoutSuccessContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -122,7 +145,7 @@ const CheckoutSuccessContent = () => {
                 Order #{order.orderNumber}
               </h2>
               <p className="text-gray-600">
-                Placed on {new Date(order.createdAt as any || Date.now()).toLocaleDateString()}
+                Placed on {formatOrderDate(order.createdAt)}
               </p>
             </div>
             <div className="mt-4 md:mt-0">
