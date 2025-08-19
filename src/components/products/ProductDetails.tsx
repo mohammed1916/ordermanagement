@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import { Product } from '@/types';
 import mockProducts from '@/data/products';
 
@@ -65,8 +66,15 @@ export default function ProductDetails() {
                 </div>
 
                 <div>
-                    <h1 className="text-3xl font-bold">{product.name}</h1>
-                    <p className="text-2xl text-gray-700 mt-2">₹ {product.price.toFixed(2)}</p>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold">{product.name}</h1>
+                            <p className="text-2xl text-gray-700 mt-2">₹ {product.price.toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                            <FavoriteButton product={product} size="lg" />
+                        </div>
+                    </div>
                     <p className="text-gray-600 mt-4">{product.description}</p>
 
                     {/* Size Selection */}

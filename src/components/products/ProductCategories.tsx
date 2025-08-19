@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import mockProducts from '@/data/products';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/components/ui/Toast';
+import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -136,7 +137,7 @@ const ProductCategories: React.FC = () => {
     }));
   };
 
-  const handleQuickAdd = async (product: Product) => {
+  const handleQuickAdd = useCallback(async (product: Product) => {
     setIsLoading(true);
     try {
       const defaultSize = product.sizes[0];
@@ -144,13 +145,49 @@ const ProductCategories: React.FC = () => {
       
       await addToCart(product, 1, defaultSize, defaultColor.name);
 
-      toast.success('Added to Cart', `${product.name} has been added to your cart!`);
+      // Use startTransition for non-urgent state updates
+      startTransition(() => {
+        toast.success('Added to Cart', `${product.name} has been added to your cart!`);
+      });
     } catch (error) {
-      toast.error('Error', 'Failed to add item to cart. Please try again.');
+      // Production-ready error handling
+      let errorMessage = 'Failed to add item to cart. Please try again.';
+      let errorTitle = 'Error';
+
+      if (error instanceof Error) {
+        // Handle specific error cases
+        if (error.message.includes('logged in') || error.message.includes('authentication')) {
+          errorTitle = 'Please log in';
+          errorMessage = 'You need to be logged in to add items to your cart.';
+        } else if (error.message.includes('out of stock')) {
+          errorTitle = 'Out of Stock';
+          errorMessage = 'This item is currently out of stock.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorTitle = 'Connection Error';
+          errorMessage = 'Please check your internet connection and try again.';
+        }
+        
+        // Log error for monitoring (only in development or with proper logging service)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Add to cart error:', error);
+        }
+        // In production, you'd send this to your logging service:
+        // logErrorToService(error, { productId: product.id, action: 'addToCart' });
+      } else {
+        // Non-Error objects
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Unexpected error type:', error);
+        }
+      }
+
+      // Use startTransition for non-urgent state updates
+      startTransition(() => {
+        toast.error(errorTitle, errorMessage);
+      });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addToCart, toast]);
 
   const clearFilters = () => {
     setFilters({
@@ -222,6 +259,7 @@ const ProductCategories: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              suppressHydrationWarning={true}
             />
           </div>
 
@@ -286,6 +324,7 @@ const ProductCategories: React.FC = () => {
                   onClick={() => setViewMode('grid')}
                   className={`p-2 ${viewMode === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'} rounded-l-lg transition-colors`}
                   aria-label="Grid view"
+                  suppressHydrationWarning={true}
                 >
                   <FiGrid className="w-5 h-5" />
                 </button>
@@ -293,6 +332,7 @@ const ProductCategories: React.FC = () => {
                   onClick={() => setViewMode('list')}
                   className={`p-2 ${viewMode === 'list' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'} rounded-r-lg transition-colors`}
                   aria-label="List view"
+                  suppressHydrationWarning={true}
                 >
                   <FiList className="w-5 h-5" />
                 </button>
@@ -385,6 +425,7 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({ label, options, value, 
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors min-w-[140px] justify-between"
+        suppressHydrationWarning={true}
       >
         <span className="text-sm">
           <span className="text-gray-500">{label}:</span>{' '}
@@ -471,17 +512,19 @@ const ProductGridCard: React.FC<ProductCardProps> = ({ product, onQuickAdd, isLo
               >
                 <FiEye className="w-5 h-5 text-gray-700" />
               </Link>
-              <button 
-                className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg"
-                aria-label="Add to wishlist"
-              >
-                <FiHeart className="w-5 h-5 text-gray-700" />
-              </button>
+              <div className="bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg">
+                <FavoriteButton 
+                  product={product} 
+                  size="md" 
+                  className="p-2"
+                />
+              </div>
               <button
                 onClick={() => onQuickAdd(product)}
                 disabled={isLoading}
                 className="p-3 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50"
                 aria-label="Add to cart"
+                suppressHydrationWarning={true}
               >
                 <FiShoppingCart className="w-5 h-5" />
               </button>
@@ -575,6 +618,13 @@ const ProductListCard: React.FC<ProductCardProps> = ({ product, onQuickAdd, isLo
             </div>
 
             <div className="flex items-center gap-3">
+              <div className="rounded-lg hover:bg-gray-50 transition-colors p-1">
+                <FavoriteButton 
+                  product={product} 
+                  size="lg" 
+                  className="p-1"
+                />
+              </div>
               <Link
                 href={`/shop/product/${product.id}`}
                 className="flex-1 py-3 text-center bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
@@ -585,6 +635,7 @@ const ProductListCard: React.FC<ProductCardProps> = ({ product, onQuickAdd, isLo
                 onClick={() => onQuickAdd(product)}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                suppressHydrationWarning={true}
               >
                 <FiShoppingCart className="w-5 h-5" />
                 Quick Add

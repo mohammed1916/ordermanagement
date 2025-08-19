@@ -3,12 +3,14 @@ import React from 'react';
 import Link from 'next/link';
 import NavBar from './NavBar';
 import { useCart } from '@/context/CartContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase'; // import firebase auth
 
 const Header = () => {
     const { cart } = useCart();
+    const { favorites } = useFavorites();
     const { user } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
@@ -45,14 +47,25 @@ const Header = () => {
                             </Link>
 
                             {user && 
-                            <Link href="/cart" className="text-gray-600 hover:text-gray-900 relative transition-colors">
-                                Cart
-                                {cart && cart.items && cart.items.length > 0 && (
-                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                                        {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
-                                    </span>
-                                )}
-                            </Link>
+                            <>
+                                <Link href="/cart" className="text-gray-600 hover:text-gray-900 relative transition-colors">
+                                    Cart
+                                    {cart && cart.items && cart.items.length > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                            {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
+                                        </span>
+                                    )}
+                                </Link>
+
+                                <Link href="/favorites" className="text-gray-600 hover:text-gray-900 relative transition-colors">
+                                    Favorites
+                                    {favorites.length > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                            {favorites.length}
+                                        </span>
+                                    )}
+                                </Link>
+                            </>
                             }
 
                             {user ? (

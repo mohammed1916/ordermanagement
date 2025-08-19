@@ -4,7 +4,9 @@ import Header from '@/components/layouts/Header';
 import Footer from '@/components/layouts/Footer';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { ToastProvider } from '@/components/ui/Toast';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -23,17 +25,21 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <CartProvider>
-            <ToastProvider>
-              <div className="min-h-screen flex flex-col">
-                <Header />
-                <main className="flex-grow container mx-auto px-4 py-8">
-                  {children}
-                </main>
-                <Footer />
-              </div>
-            </ToastProvider>
-          </CartProvider>
+          <ErrorBoundary>
+            <FavoritesProvider>
+              <CartProvider>
+                <ToastProvider>
+                  <div className="min-h-screen flex flex-col">
+                    <Header />
+                    <main className="flex-grow container mx-auto px-4 py-8">
+                      {children}
+                    </main>
+                    <Footer />
+                  </div>
+                </ToastProvider>
+              </CartProvider>
+            </FavoritesProvider>
+          </ErrorBoundary>
         </AuthProvider>
       </body>
     </html>
