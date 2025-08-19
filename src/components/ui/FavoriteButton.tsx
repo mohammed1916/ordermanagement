@@ -79,6 +79,7 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
         ${className}
       `}
       title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+      suppressHydrationWarning={true}
     >
       <svg
         className={`${sizeClasses[size]} transition-all duration-200`}

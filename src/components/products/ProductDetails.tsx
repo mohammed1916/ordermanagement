@@ -89,6 +89,7 @@ export default function ProductDetails() {
                                         ? 'border-blue-500 bg-blue-50 text-blue-600'
                                         : 'border-gray-300'
                                         }`}
+                                    suppressHydrationWarning={true}
                                 >
                                     {size}
                                 </button>
@@ -109,6 +110,7 @@ export default function ProductDetails() {
                                     disabled={!product.inStock || isSingleColor}
                                     onClick={() => setSelectedColor(color.name)}
                                     title={isSingleColor ? 'Color' : 'Select this color'}
+                                    suppressHydrationWarning={true}
                                     className={`
                                     w-8 h-8 rounded-full border-2
                                     ${color.class}
@@ -162,6 +164,7 @@ export default function ProductDetails() {
                             onClick={handleAddToCart}
                             disabled={isAddingToCart || !product.inStock}
                             className="w-full bg-blue-600 text-white py-3 px-6 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                            suppressHydrationWarning={true}
                         >
                             {isAddingToCart
                                 ? 'Adding...'
@@ -177,6 +180,7 @@ export default function ProductDetails() {
                             type='button'
                             onClick={handleViewCart}
                             className="w-full bg-black text-white py-3 px-6 rounded hover:bg-gray-800 disabled:bg-gray-400"
+                            suppressHydrationWarning={true}
                         >
                             View Cart
                         </button>}

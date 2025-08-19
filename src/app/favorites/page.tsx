@@ -161,6 +161,7 @@ const FavoritesPage: React.FC = () => {
                       disabled={!product.inStock}
                       className="p-3 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       aria-label="Add to cart"
+                      suppressHydrationWarning={true}
                     >
                       <FiShoppingCart className="w-5 h-5" />
                     </button>
@@ -194,6 +195,7 @@ const FavoritesPage: React.FC = () => {
                     onClick={() => handleAddToCart(product)}
                     disabled={!product.inStock}
                     className="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    suppressHydrationWarning={true}
                   >
                     {product.inStock ? 'Add to Cart' : 'Out of Stock'}
                   </button>
