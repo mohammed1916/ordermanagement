@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { useToast } from '@/components/ui/Toast';
 import { Address, User } from '@/types';
 import { Cart, CartItem } from '@/lib/firestore/schemas';
 import {PaymentStep} from '@/components/checkout/PaymentStep';
@@ -455,6 +456,7 @@ const ReviewStep: React.FC<{
 export default withAuth(function Checkout({ user }: { user: User }) {
     const router = useRouter();
     const { cart, clearCart } = useCart();
+    const { error: showError } = useToast();
 
     const [step, setStep] = useState<Step>('phone');
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -794,10 +796,11 @@ export default withAuth(function Checkout({ user }: { user: User }) {
                 // Redirect to success page with order details
                 router.push(`/checkout/success?orderId=${result.orderId}&orderNumber=${result.orderNumber}`);
             } else {
-                throw new Error(result.error || 'Failed to create order');
+                showError('Order Failed', result.error || 'Failed to create order. Please try again.');
             }
         } catch (error) {
             console.error('Error placing order:', error);
+            showError('Order Failed', 'An unexpected error occurred. Please try again.');
             setIsProcessing(false);
         }
     };

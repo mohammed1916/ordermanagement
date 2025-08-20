@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { useToast } from '@/components/ui/Toast';
 import { FavoriteButton } from '@/components/ui/FavoriteButton';
 import { Product } from '@/types';
 import mockProducts from '@/data/products';
 
 export default function ProductDetails() {
     const { addToCart } = useCart();
+    const { success, error: showError } = useToast();
     const params = useParams();
     const productId = params?.productId as string;
 
@@ -29,21 +31,31 @@ export default function ProductDetails() {
         }
     }, [productId]);
 
-    const handleAddToCart = () => {
+    const handleAddToCart = async () => {
         if (!product) return;
         if (!selectedSize) return setError('Please select a size');
         if (!selectedColor) return setError('Please select a color');
+        
         setError('');
         setIsAddingToCart(true);
 
-        setIsAddingToCart(true);
-        
-        addToCart(product, quantity, selectedSize, selectedColor);
-        setIsAddingToCart(false);
-        setAddedToCart(true);
-
-        setTimeout(() => setAddedToCart(false), 3000);
-            };
+        try {
+            const result = await addToCart(product, quantity, selectedSize, selectedColor);
+            
+            if (result) {
+                success('Added to Cart', `${product.name} has been added to your cart`);
+                setAddedToCart(true);
+                setTimeout(() => setAddedToCart(false), 3000);
+            } else {
+                showError('Add to Cart Failed', 'Failed to add item to cart. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            showError('Add to Cart Failed', 'Failed to add item to cart. Please try again.');
+        } finally {
+            setIsAddingToCart(false);
+        }
+    };
 
     if (!product) {
         return <div className="p-10 text-gray-500">Loading product...</div>;

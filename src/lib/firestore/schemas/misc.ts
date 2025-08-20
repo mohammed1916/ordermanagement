@@ -153,36 +153,33 @@ export const INVENTORY_TRANSACTIONS_COLLECTION = 'inventoryTransactions';
 export const NOTIFICATIONS_COLLECTION = 'notifications';
 
 // Validation functions
-export const validateCouponData = (data: Omit<Coupon, 'id'>): void => {
+export const validateCouponData = (data: Omit<Coupon, 'id'>): string | null => {
   if (!data.code || !data.name || !data.discountValue) {
-    throw new Error('Code, name, and discount value are required');
+    return 'Code, name, and discount value are required';
   }
-  
   if (data.discountType === 'percentage' && (data.discountValue <= 0 || data.discountValue > 100)) {
-    throw new Error('Percentage discount must be between 1 and 100');
+    return 'Percentage discount must be between 1 and 100';
   }
-  
   if (data.discountType === 'fixed' && data.discountValue <= 0) {
-    throw new Error('Fixed discount must be greater than 0');
+    return 'Fixed discount must be greater than 0';
   }
-  
   if (data.validFrom >= data.validUntil) {
-    throw new Error('Valid from date must be before valid until date');
+    return 'Valid from date must be before valid until date';
   }
+  return null;
 };
 
-export const validateProductReview = (data: Omit<ProductReview, 'id'>): void => {
+export const validateProductReview = (data: Omit<ProductReview, 'id'>): string | null => {
   if (!data.productId || !data.userId || !data.rating) {
-    throw new Error('Product ID, user ID, and rating are required');
+    return 'Product ID, user ID, and rating are required';
   }
-  
   if (data.rating < 1 || data.rating > 5) {
-    throw new Error('Rating must be between 1 and 5');
+    return 'Rating must be between 1 and 5';
   }
-  
   if (data.comment && data.comment.length > 1000) {
-    throw new Error('Review comment cannot exceed 1000 characters');
+    return 'Review comment cannot exceed 1000 characters';
   }
+  return null;
 };
 
 // Helper functions

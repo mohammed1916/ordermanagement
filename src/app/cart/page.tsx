@@ -4,36 +4,45 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
+import { useToast } from '@/components/ui/Toast';
 import withAuth from '@/components/hoc/withAuth';
 
 function Cart() {
-    const { cart, updateQuantity, removeFromCart, isLoading } = useCart();
+    const { cart, updateQuantity, removeFromCart, isLoading, error } = useCart();
+    const { success, error: showError } = useToast();
     const [isUpdating, setIsUpdating] = useState<string | null>(null); // Track which item is being updated
-    const [error, setError] = useState<string | null>(null);
 
-    // Handle quantity update with error handling
+    // Handle quantity update with toast notifications
     const handleQuantityUpdate = async (productId: string, newQuantity: number) => {
         try {
             setIsUpdating(productId);
-            setError(null);
-            await updateQuantity(productId, newQuantity);
+            const result = await updateQuantity(productId, newQuantity);
+            if (result) {
+                success('Quantity Updated', 'Item quantity updated successfully');
+            } else {
+                showError('Update Failed', 'Failed to update quantity. Please try again.');
+            }
         } catch (error) {
             console.error('Error updating quantity:', error);
-            setError('Failed to update quantity. Please try again.');
+            showError('Update Failed', 'Failed to update quantity. Please try again.');
         } finally {
             setIsUpdating(null);
         }
     };
 
-    // Handle item removal with error handling
+    // Handle item removal with toast notifications
     const handleRemoveItem = async (productId: string) => {
         try {
             setIsUpdating(productId);
-            setError(null);
-            await removeFromCart(productId);
+            const result = await removeFromCart(productId);
+            if (result) {
+                success('Item Removed', 'Item removed from cart successfully');
+            } else {
+                showError('Remove Failed', 'Failed to remove item. Please try again.');
+            }
         } catch (error) {
             console.error('Error removing item:', error);
-            setError('Failed to remove item. Please try again.');
+            showError('Remove Failed', 'Failed to remove item. Please try again.');
         } finally {
             setIsUpdating(null);
         }
@@ -78,7 +87,7 @@ function Cart() {
         <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
 
-            {/* Error Message */}
+            {/* Error Message from Cart Context */}
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
                     <div className="flex">
@@ -89,20 +98,6 @@ function Cart() {
                         </div>
                         <div className="ml-3">
                             <p className="text-sm text-red-800">{error}</p>
-                        </div>
-                        <div className="ml-auto pl-3">
-                            <div className="-mx-1.5 -my-1.5">
-                                <button
-                                    onClick={() => setError(null)}
-                                    className="inline-flex bg-red-50 rounded-md p-1.5 text-red-500 hover:bg-red-100"
-                                    title="Close error message"
-                                    aria-label="Close error message"
-                                >
-                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>

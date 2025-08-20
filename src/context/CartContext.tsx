@@ -7,11 +7,12 @@ import { useAuth } from '@/context/AuthContext';
 
 interface CartContextType {
   cart: Cart | null;
-  addToCart: (product: Product, quantity: number, size: string, color: string) => Promise<void>;
-  removeFromCart: (productId: string) => Promise<void>;
-  updateQuantity: (productId: string, quantity: number) => Promise<void>;
-  clearCart: () => Promise<void>;
+  addToCart: (product: Product, quantity: number, size: string, color: string) => Promise<boolean>;
+  removeFromCart: (productId: string) => Promise<boolean>;
+  updateQuantity: (productId: string, quantity: number) => Promise<boolean>;
+  clearCart: () => Promise<boolean>;
   isLoading: boolean;
+  error: string | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -20,6 +21,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, isLoading: authLoading } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -52,10 +54,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCart();
   }, [user, authLoading]);
 
-  const addToCart = async (product: Product, quantity: number, size: string, color: string): Promise<void> => {
+  const addToCart = async (product: Product, quantity: number, size: string, color: string): Promise<boolean> => {
     if (!user) {
-      throw new Error('User must be logged in to add items to cart');
+      setError('Please sign in to add items to your cart');
+      return false;
     }
+
+    setError(null);
 
     try {
       const cartItem: Omit<CartItem, 'id' | 'addedAt'> = {
@@ -76,22 +81,28 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Refresh cart data
       const updatedCart = await cartService.getUserCart(user.id);
       setCart(updatedCart);
+      return true;
     } catch (error) {
       console.error('Error adding to cart:', error);
-      throw error; // Re-throw to allow caller to handle
+      setError('Failed to add item to cart. Please try again.');
+      return false;
     }
   };
 
-  const removeFromCart = async (productId: string): Promise<void> => {
+  const removeFromCart = async (productId: string): Promise<boolean> => {
     if (!user || !cart) {
-      throw new Error('User must be logged in and have a cart to remove items');
+      setError('Please sign in to manage your cart');
+      return false;
     }
+
+    setError(null);
 
     try {
       // Find the item to remove
       const itemToRemove = cart.items.find((item: CartItem) => item.productId === productId);
       if (!itemToRemove) {
-        throw new Error('Item not found in cart');
+        setError('Item not found in cart');
+        return false;
       }
 
       await cartService.removeFromCart(user.id, itemToRemove.id);
@@ -99,26 +110,33 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Refresh cart data
       const updatedCart = await cartService.getUserCart(user.id);
       setCart(updatedCart);
+      return true;
     } catch (error) {
       console.error('Error removing from cart:', error);
-      throw error; // Re-throw to allow caller to handle
+      setError('Failed to remove item from cart. Please try again.');
+      return false;
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number): Promise<void> => {
+  const updateQuantity = async (productId: string, quantity: number): Promise<boolean> => {
     if (!user || !cart) {
-      throw new Error('User must be logged in and have a cart to update quantities');
+      setError('Please sign in to manage your cart');
+      return false;
     }
 
     if (quantity < 1) {
-      throw new Error('Quantity must be at least 1');
+      setError('Quantity must be at least 1');
+      return false;
     }
+
+    setError(null);
 
     try {
       // Find the item to update
       const itemToUpdate = cart.items.find((item: CartItem) => item.productId === productId);
       if (!itemToUpdate) {
-        throw new Error('Item not found in cart');
+        setError('Item not found in cart');
+        return false;
       }
 
       await cartService.updateCartItemQuantity(user.id, itemToUpdate.id, quantity);
@@ -126,23 +144,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Refresh cart data
       const updatedCart = await cartService.getUserCart(user.id);
       setCart(updatedCart);
+      return true;
     } catch (error) {
       console.error('Error updating cart quantity:', error);
-      throw error; // Re-throw to allow caller to handle
+      setError('Failed to update quantity. Please try again.');
+      return false;
     }
   };
 
-  const clearCart = async (): Promise<void> => {
+  const clearCart = async (): Promise<boolean> => {
     if (!user) {
-      throw new Error('User must be logged in to clear cart');
+      setError('Please sign in to clear your cart');
+      return false;
     }
+
+    setError(null);
 
     try {
       await cartService.clearCart(user.id);
       setCart(null);
+      return true;
     } catch (error) {
       console.error('Error clearing cart:', error);
-      throw error; // Re-throw to allow caller to handle
+      setError('Failed to clear cart. Please try again.');
+      return false;
     }
   };
 
@@ -155,6 +180,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateQuantity,
         clearCart,
         isLoading,
+        error,
       }}
     >
       {children}

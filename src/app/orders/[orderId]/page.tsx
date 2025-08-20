@@ -180,9 +180,11 @@ const OrderDetailPage = () => {
         
         try {
           // Check if user is still authenticated
-          if (!user.id) {
-            throw new Error('Authentication required. Please log in again.');
-          }
+            if (!user.id) {
+              toast.error('Authentication Required', 'Please log in to cancel your order.');
+              setIsCancelling(false);
+              return;
+            }
 
           await orderService.cancelOrder(order.id!, 'Cancelled by customer', user.id);
           
